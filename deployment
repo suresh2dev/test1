@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: random-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: random-app
+  template:
+    metadata:
+      labels:
+        app: random-app
+    spec:
+      containers:
+      - name: random-container
+        image: random-app:1.0   # or <your-dockerhub-username>/random-app:1.0
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: random-app-service
+spec:
+  selector:
+    app: random-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: NodePort
