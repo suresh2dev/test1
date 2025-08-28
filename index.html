@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Random Number Generator</title>
+  <style>
+    :root { --bg:#0b1220; --card:#111a2b; --accent:#6ee7ff; --text:#e6f0ff; --muted:#9fb3c8; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif; background: linear-gradient(180deg, #0b1220, #0e1628 40%, #0b1220); color: var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .card { width: min(720px, 100%); background: var(--card); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    h1 { margin: 0 0 4px; letter-spacing: .3px; font-size: 26px; }
+    p.sub { margin: 0 0 20px; color: var(--muted); }
+    .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    label { font-size: 12px; color: var(--muted); display:block; margin: 0 0 6px; }
+    input[type="number"] { width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.08); background:#0c1426; color:var(--text); outline:none; }
+    input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110,231,255,.15); }
+    .row { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-top:10px; }
+    .check { display:flex; gap:8px; align-items:center; color: var(--muted); font-size: 14px; }
+    .btn { cursor:pointer; border:none; padding:10px 14px; border-radius:12px; background: linear-gradient(90deg, #27c6ff, #00ffa6); color:#041220; font-weight:700; letter-spacing:.3px; }
+    .btn.secondary { background:transparent; border:1px solid rgba(255,255,255,.15); color:var(--text); font-weight:600; }
+    .output { margin-top:18px; padding:14px; background:#0a1324; border:1px dashed rgba(255,255,255,.12); border-radius:12px; min-height:62px; display:flex; align-items:center; justify-content:flex-start; gap:12px; flex-wrap:wrap; }
+    .pill { padding:8px 12px; background:#111b30; border:1px solid rgba(255,255,255,.08); border-radius:999px; }
+    .history { margin-top:18px; }
+    .hist-item { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; padding:10px 12px; border-radius:10px; background:#0c1528; border:1px solid rgba(255,255,255,.06); color: #cfe7ff; margin-top:8px; }
+    .tips { margin-top:6px; font-size:12px; color:var(--muted); }
+    .footer { margin-top:18px; display:flex; gap:10px; justify-content:flex-end; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Random Number Generator</h1>
+    <p class="sub">Generate single or multiple numbers with optional uniqueness.</p>
+
+    <div class="grid">
+      <div>
+        <label for="min">Minimum</label>
+        <input type="number" id="min" value="1">
+      </div>
+      <div>
+        <label for="max">Maximum</label>
+        <input type="number" id="max" value="100">
+      </div>
+      <div>
+        <label for="count">How many?</label>
+        <input type="number" id="count" value="1" min="1">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="check">
+        <input type="checkbox" id="unique" />
+        <label for="unique">Unique numbers only</label>
+      </div>
+      <div class="row" style="gap:8px;">
+        <button class="btn" id="generate">Generate</button>
+        <button class="btn secondary" id="copy">Copy</button>
+        <button class="btn secondary" id="clear">Clear history</button>
+      </div>
+    </div>
+
+    <div class="output" id="output" aria-live="polite"></div>
+    <div class="tips" id="hint"></div>
+
+    <div class="history" id="history"></div>
+    <div class="footer">
+      <small class="tips">Tip: Set min &lt;= max. For uniqueness, count cannot exceed range size.</small>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const el = (id) => document.getElementById(id);
+  const min = el('min'), max = el('max'), count = el('count');
+  const unique = el('unique'), out = el('output'), hist = el('history'), hint = el('hint');
+  const btnGen = el('generate'), btnCopy = el('copy'), btnClear = el('clear');
+
+  const pills = (arr) => arr.map(n => `<span class="pill">${n}</span>`).join('');
+
+  function generate() {
+    const a = Number(min.value), b = Number(max.value), k = Math.max(1, Number(count.value)||1);
+    hint.textContent = '';
+    out.innerHTML = '';
+    if (Number.isNaN(a) || Number.isNaN(b)) return showError('Please enter valid numbers.');
+    const lo = Math.min(a,b), hi = Math.max(a,b);
+    const range = hi - lo + 1;
+    if (unique.checked && k > range) return showError(`Cannot pick ${k} unique values from range size ${range}.`);
+
+    let nums = [];
+    if (unique.checked) {
+      // Fisher–Yates on a limited range using reservoir shuffle idea
+      const set = new Set();
+      while (set.size < k) {
+        set.add(Math.floor(Math.random() * range) + lo);
+      }
+      nums = Array.from(set);
+    } else {
+      for (let i=0;i<k;i++) {
+        nums.push(Math.floor(Math.random() * range) + lo);
+      }
+    }
+    nums.sort((x,y) => x - y);
+    out.innerHTML = pills(nums);
+    addHistory(nums, lo, hi, k, unique.checked);
+    return nums;
+  }
+
+  function addHistory(nums, lo, hi, k, uniq) {
+    const div = document.createElement('div');
+    const now = new Date().toLocaleString();
+    div.className = 'hist-item';
+    div.textContent = `[${now}] ${k} ${uniq?'unique ':''}in [${lo}, ${hi}] -> ${nums.join(', ')}`;
+    hist.prepend(div);
+  }
+
+  function showError(msg) {
+    hint.textContent = msg;
+  }
+
+  btnGen.addEventListener('click', generate);
+
+  btnCopy.addEventListener('click', async () => {
+    const text = out.textContent.trim().replace(/\s+/g, ' ');
+    if (!text) { hint.textContent = 'Nothing to copy.'; return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      hint.textContent = 'Copied to clipboard ✅';
+      setTimeout(()=>hint.textContent='', 1500);
+    } catch(e) {
+      hint.textContent = 'Copy failed. Select and copy manually.';
+    }
+  });
+
+  btnClear.addEventListener('click', () => { hist.innerHTML = ''; });
+
+  // Keyboard: Enter triggers generate
+  [min,max,count,unique].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); }));
+})();
+</script>
+</body>
+</html>
